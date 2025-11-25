@@ -35,7 +35,7 @@ __requirement__ = [
         'scikit-learn == 1.5.2',
         'requests==2.32.3',
         'scipy==1.14.1',
-        'urllib3==2.2.3',
+        'urllib3==2.5.0',
         'joblib==1.4.2',
 ]
 
