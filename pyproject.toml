@@ -1,6 +1,46 @@
-[build-system]
-requires = [
-  "setuptools >= 70.0.0",
-  "wheel",
+[project]
+name = "rabbit"
+version = "3.0.0rc1"
+license = {text = "Apache-2.0"}
+description = "GitHub bot identification tool based on activity sequences"
+readme = {file = "README.md", content-type = "text/markdown"}
+urls = {Homepage = "https://github.com/sgl-umons/RABBIT"}
+requires-python = ">=3.11"
+dependencies = [
+    "ghmap>=1.0.6",
+    "joblib>=1.5.2",
+    "numpy>=2.3.5",
+    "pandas>=2.3.3",
+    "requests>=2.32.5",
+    "scikit-learn==1.5.2",
+    "typer>=0.20.0",
 ]
-build-backend = "setuptools.build_meta"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+rabbit = "rabbit.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "responses>=0.25.8",
+    "ruff>=0.14.7",
+]
+
+[tool.ruff]
+src = ["rabbit", "tests"]
+
+[tool.ruff.lint]
+# allow unused imports in __init__.py files
+per-file-ignores = { "__init__.py" = ["F401"] }
+
+[tool.coverage.run]
+branch = true
+source = ["rabbit"]
+omit = [
+    "*/__init__.py",
+]
