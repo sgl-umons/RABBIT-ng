@@ -1,3 +1,5 @@
+from enum import Enum
+
 import pandas as pd
 
 from .sources import GitHubAPIExtractor
@@ -7,12 +9,18 @@ from .errors import RabbitErrors, NotFoundError
 from rich.progress import track
 
 
-def _save_results(all_results, output_type, save_path):
+class OutputFormat(str, Enum):
+    TERMINAL = "term"
+    CSV = "csv"
+    JSON = "json"
+
+
+def _save_results(all_results, output_type: OutputFormat, save_path: str):
     """Save the result in the specified format and path."""
 
-    if output_type == "csv":
+    if output_type == OutputFormat.CSV:
         all_results.to_csv(save_path, index=False)
-    elif output_type == "json":
+    elif output_type == OutputFormat.JSON:
         all_results.to_json(save_path, orient="records", indent=4)
     else:  # Print to console
         print(all_results.to_string(index=False))
@@ -58,7 +66,7 @@ def run_rabbit(
     min_events: int = 5,
     min_confidence: float = 1.0,
     max_queries: int = 3,
-    output_type: str = "text",
+    output_type: OutputFormat = OutputFormat.TERMINAL,
     output_path: str = "",
     _verbose: bool = False,
     incremental: bool = False,
