@@ -1,15 +1,30 @@
 from pathlib import Path
 from typing import Annotated, Optional
+from rich.logging import RichHandler
 
 import typer
+import logging
 
 from rabbit.main import OutputFormat
-from . import run_rabbit
+from . import run_rabbit, RetryableError
 
 app = typer.Typer(
     help="RABBIT is an Activity Based Bot Identification Tool that identifies bots "
     "based on their recent activities in GitHub"
 )
+
+
+def setup_logger(debug: bool = False):
+    log_level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format="%(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[RichHandler(rich_tracebacks=True, show_path=False)],
+    )
+
+    # Use only warning logs for urllib3 to reduce verbosity
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
 @app.command()
@@ -109,48 +124,81 @@ def cli(
             rich_help_panel="Output",
         ),
     ] = False,
+    debug: Annotated[
+        bool,
+        typer.Option(
+            "--debug",
+            help="Enable debug logging.",
+            rich_help_panel="Output",
+        ),
+    ] = False,
 ):
     """Identify bot contributors based on their activity sequences in GitHub."""
+
+    setup_logger(debug)
+    logger = logging.getLogger("rabbit.cli")
+
     if contributors is None:
         contributors = []
 
     if input_file is None and len(contributors) == 0:
-        typer.echo(
-            "Error: Provide either contributor names or an input file.", err=True
+        logger.error(
+            "No contributors provided. Provide at least one contributor or an input file. (--help for more info)"
         )
         raise typer.Exit(code=1)
 
-    if key is None or len(key) < 40:
-        typer.echo(
-            "Warning: A valid GitHub API key is recommended for higher rate limits.",
-            err=True,
-        )
+    if key is None:
+        logger.warning("No API key provided. Rate limits will be low (60/hr).")
 
     if input_file is not None:
         # Read txt file and extract contributors
-        with open(input_file, "r") as f:
-            file_contributors = [line.strip() for line in f if line.strip()]
+        file_content = input_file.read_text(encoding="utf-8")
+        file_contributors = [
+            line.strip() for line in file_content.splitlines() if line.strip()
+        ]
         contributors.extend(file_contributors)
 
-    if format is OutputFormat.CSV or format is OutputFormat.JSON:
-        if output_path is None:
-            typer.echo(
-                f"Error: Output path must be specified for {format.value} format.",
-                err=True,
-            )
-            raise typer.Exit(code=1)
+    if output_format in (OutputFormat.CSV, OutputFormat.JSON) and output_path is None:
+        logger.warning(
+            "No output path provided. Results will be saved in the current directory."
+        )
+        output_path = "."
 
-    run_rabbit(
-        contributors=contributors,
-        api_key=key,
-        min_events=min_events,
-        min_confidence=min_confidence,
-        max_queries=max_queries,
-        output_type=output_format,
-        output_path=str(output_path) if output_path else "",
-        _verbose=verbose,
-        incremental=incremental,
+    logger.info(
+        f"Starting RABBIT Bot Identification Tool on {len(contributors)} contributors."
     )
+    logger.debug("Running RABBIT with the following parameters:")
+    logger.debug(f"\tContributors: {contributors}")
+    logger.debug(f"\tAPI Key: {'Provided' if key else 'Not Provided'}")
+    logger.debug(f"\tMin Events: {min_events}")
+    logger.debug(f"\tMin Confidence: {min_confidence}")
+    logger.debug(f"\tMax Queries: {max_queries}")
+    logger.debug(f"\tOutput Format: {output_format}")
+    logger.debug(f"\tOutput Path: {output_path}")
+    logger.debug(f"\tIncremental: {incremental}")
+    logger.debug(f"\tVerbose: {verbose}")
+
+    try:
+        run_rabbit(
+            contributors=contributors,
+            api_key=key,
+            min_events=min_events,
+            min_confidence=min_confidence,
+            max_queries=max_queries,
+            output_type=output_format,
+            output_path=str(output_path) if output_path else "",
+            _verbose=verbose,
+            incremental=incremental,
+        )
+        logger.info("RABBIT completed successfully.")
+
+    except RetryableError as e:
+        logger.error(f"API rate limit or network issue: {e}")
+        logger.info("Please try again later or provide a GitHub API key.")
+        raise typer.Exit(code=2)
+    except Exception as e:
+        logger.critical(f"Unexpected error: {e}", exc_info=debug)
+        raise typer.Exit(code=3)
 
 
 if __name__ == "__main__":

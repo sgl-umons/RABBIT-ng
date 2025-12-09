@@ -33,6 +33,7 @@ class Predictor(ABC):
 
     @abstractmethod
     def _load_model(self):
+        logger.debug(f"Loading model from {self.model_path}")
         pass
 
     @abstractmethod
@@ -54,16 +55,16 @@ class Predictor(ABC):
 
 class ONNXPredictor(Predictor):
     def __init__(self, model_path: str = None):
+        self.input_name = None
+        self.output_name = None
         super().__init__(
             model_path
             if model_path
             else files("rabbit").joinpath("resources", "models", "bimbas.onnx")
         )
-        self.input_name = None
-        self.output_name = None
-        self._load_model()
 
     def _load_model(self):
+        logger.debug(f"Loading ONNX model from {self.model_path}")
         try:
             self.model = onnxruntime.InferenceSession(
                 self.model_path, providers=["CPUExecutionProvider"]

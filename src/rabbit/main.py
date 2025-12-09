@@ -2,6 +2,7 @@ from enum import Enum
 import logging
 
 import pandas as pd
+from pandas import DataFrame
 
 from .predictor.models import Predictor, ONNXPredictor
 from .sources import GitHubAPIExtractor
@@ -19,8 +20,11 @@ class OutputFormat(str, Enum):
     JSON = "json"
 
 
-def _save_results(all_results, output_type: OutputFormat, save_path: str):
+def _save_results(all_results: DataFrame, output_type: OutputFormat, save_path: str):
     """Save the result in the specified format and path."""
+    if all_results.empty:
+        logger.debug("No results to save.")
+        return
 
     if output_type == OutputFormat.CSV:
         all_results.to_csv(save_path, index=False)
@@ -130,10 +134,8 @@ def run_rabbit(
 
     except RuntimeError as err:
         rabbit_errors = RabbitErrors(str(err))
-        logger.critical(rabbit_errors)
         raise rabbit_errors from err
     except Exception as e:
-        logger.critical(e)
         raise e from e
     finally:
         if not incremental:

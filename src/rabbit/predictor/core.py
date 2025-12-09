@@ -40,7 +40,13 @@ def _compute_activity_sequences(events: list) -> list:
         logger.debug(f"Mapped {len(actions)} actions to {len(activities)} activities.")
     captured_output = stdout_capture.getvalue()
     if captured_output:
-        logger.debug("ghmap output:\n%s", captured_output)
+        # Filter output to keep only relevant debug info ("Warning: unused actions" and {actions})
+        text = ""
+        for line in captured_output.splitlines():
+            if "Warning: unused actions" in line or line.strip().startswith("{'"):
+                text += line + " "
+        if text:
+            logger.debug("ghmap output: %s", text.strip())
 
     return activities
 
