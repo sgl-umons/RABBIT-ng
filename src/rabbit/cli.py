@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Annotated, Optional
 from rich.logging import RichHandler
+from dotenv import load_dotenv
 
 import typer
 import logging
@@ -12,6 +13,8 @@ app = typer.Typer(
     help="RABBIT is an Activity Based Bot Identification Tool that identifies bots "
     "based on their recent activities in GitHub"
 )
+
+load_dotenv()
 
 
 def setup_logger(debug: bool = False):
@@ -56,7 +59,8 @@ def cli(
         typer.Option(
             "--key",
             "-k",
-            help="GitHub API key (required for >60 queries/hour)",
+            envvar="GITHUB_API_KEY",
+            help="GitHub API key (either in command line or in GITHUB_API_KEY env variable).",
             rich_help_panel="Configuration",
         ),
     ] = None,
@@ -128,6 +132,7 @@ def cli(
         bool,
         typer.Option(
             "--debug",
+            envvar="RABBIT_DEBUG",
             help="Enable debug logging.",
             rich_help_panel="Output",
         ),
