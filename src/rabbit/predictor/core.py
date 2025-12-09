@@ -43,8 +43,11 @@ def _compute_activity_sequences(events: list) -> list:
         # Filter output to keep only relevant debug info ("Warning: unused actions" and {actions})
         text = ""
         for line in captured_output.splitlines():
-            if "Warning: unused actions" in line or line.strip().startswith("{'"):
-                text += line + " "
+            if "Warning: Unused actions" in line or line.strip().startswith("{'"):
+                # Keep only the part of the line after the warning
+                line = line[line.index("Warning: Unused actions") :]
+                text += line + "\n"
+
         if text:
             logger.debug("ghmap output: %s", text.strip())
 
@@ -55,7 +58,6 @@ def predict_user_type(username: str, events: list, predictor: Predictor) -> tupl
     """
     Predict the user type (bot or human) based on the given events
     """
-    # TODO: manage return formats as in old rabbit
     activities = _compute_activity_sequences(events)
     if len(activities) == 0:
         # Events where found but no activities could be computed
