@@ -1,6 +1,9 @@
 """Custom errors for API operations."""
 
+import logging
 from requests import Response
+
+logger = logging.getLogger(__name__)
 
 
 class RabbitErrors(Exception):
@@ -28,7 +31,8 @@ class RateLimitExceededError(RabbitErrors):
         reset_time = datetime.strptime(self.reset_time, "%Y-%m-%d %H:%M:%S")
         time_diff = (reset_time - datetime.now()).total_seconds()
         if time_diff > 0:
-            print(
+            logger.warning(
+                "[Rate Limit Exceeded] "
                 f"Waiting for {time_diff} seconds until rate limit reset. "
                 f"Reset at {reset_time}."
             )

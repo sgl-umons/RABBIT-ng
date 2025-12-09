@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rabbit.predictor import predict_user_type
+from rabbit.predictor import predict_user_type, ONNXPredictor
 
 
 class TestPredictor:
@@ -8,7 +8,7 @@ class TestPredictor:
         events = []
 
         username = "test"
-        user_type, confidence = predict_user_type(username, events)
+        user_type, confidence = predict_user_type(username, events, ONNXPredictor())
         assert user_type == "Unknown"
         assert confidence == "-"
 
@@ -21,6 +21,8 @@ class TestPredictor:
             human_events = json.load(f)
 
         username = "test"
-        user_type, confidence = predict_user_type(username, human_events)
+        user_type, confidence = predict_user_type(
+            username, human_events, ONNXPredictor()
+        )
         assert user_type == "Human"
         assert 0.0 <= confidence <= 1.0

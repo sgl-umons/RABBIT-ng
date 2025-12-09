@@ -32,12 +32,12 @@ class TestCLI:
         result = runner.invoke(app, ["octocat"])
 
         assert result.exit_code == 0
-        assert mock_run_rabbit.call_args.kwargs["output_type"] == "text"
+        assert mock_run_rabbit.call_args.kwargs["output_type"] == "term"
         assert mock_run_rabbit.call_args.kwargs["output_path"] == ""
 
     def test_csv_output(self, mock_run_rabbit, tmp_path):
         csv_file = tmp_path / "test_output.csv"
-        result = runner.invoke(app, ["octocat", "--csv", str(csv_file)])
+        result = runner.invoke(app, ["octocat", "-f", "csv", "-o", str(csv_file)])
 
         assert result.exit_code == 0
         assert mock_run_rabbit.call_args.kwargs["output_type"] == "csv"
@@ -45,7 +45,7 @@ class TestCLI:
 
     def test_json_output(self, mock_run_rabbit, tmp_path):
         json_file = tmp_path / "test_output.json"
-        result = runner.invoke(app, ["octocat", "--json", str(json_file)])
+        result = runner.invoke(app, ["octocat", "-f", "json", "-o", str(json_file)])
 
         assert result.exit_code == 0
         assert mock_run_rabbit.call_args.kwargs["output_type"] == "json"
@@ -110,7 +110,9 @@ class TestIntegration:
                 test_user,
                 "--key",
                 "valid_github_api_key_which_is_long_enough_1234567890",
-                "--json",
+                "-f",
+                "json",
+                "-o",
                 f"/{tmp_path}/output.json",
             ],
         )

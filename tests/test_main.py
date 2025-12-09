@@ -3,7 +3,12 @@ from unittest.mock import patch
 import pytest
 import pandas as pd
 
-from rabbit.main import _save_results, _process_single_contributor, run_rabbit
+from rabbit.main import (
+    _save_results,
+    _process_single_contributor,
+    run_rabbit,
+    OutputFormat,
+)
 from rabbit.errors import RabbitErrors
 
 
@@ -23,7 +28,7 @@ class TestSaveResults:
         """Test if results are saved correctly in CSV format."""
         output_file = tmp_path / "results.csv"
 
-        _save_results(sample_data, "csv", output_file)
+        _save_results(sample_data, OutputFormat.CSV, str(output_file))
 
         assert output_file.exists()
         df_res = pd.read_csv(output_file)
@@ -34,16 +39,16 @@ class TestSaveResults:
         """Test if results are saved correctly in JSON format."""
         output_file = tmp_path / "results.json"
 
-        _save_results(sample_data, "json", output_file)
+        _save_results(sample_data, OutputFormat.JSON, str(output_file))
 
         assert output_file.exists()
         df_res = pd.read_json(output_file)
         assert len(df_res) == 2
         assert "user2" in df_res["contributor"].values
 
-    def test_save_results_text(self, capsys, sample_data):
+    def test_print_results_term(self, capsys, sample_data):
         """Test if results are printed in the console in text format."""
-        _save_results(sample_data, "text", None)
+        _save_results(sample_data, OutputFormat.TERMINAL, "")
 
         captured = capsys.readouterr()
         assert "user1" in captured.out
@@ -53,25 +58,32 @@ class TestSaveResults:
 class TestProcessSingleContributor:
     """Tests for the _process_single_contributor function."""
 
+    @patch("rabbit.main.ONNXPredictor")
     @patch("rabbit.main.GitHubAPIExtractor")
     @patch("rabbit.main.predict_user_type")
-    def test_process_contributor_success(self, mock_predict, mock_gh_extractor):
+    def test_process_contributor_success(
+        self, mock_predict, mock_gh_extractor, mock_predictor
+    ):
         """Test _process_single_contributor returns correct type and confidence."""
 
         mock_gh_extractor.query_events.return_value = [{}] * 10  # Simulate 10 events
         mock_predict.return_value = ("Human", 0.95)
 
         result = _process_single_contributor(
-            "testuser", mock_gh_extractor, min_events=5
+            "testuser",
+            mock_gh_extractor,
+            predictor=mock_predictor,
+            min_events=5,
         )
 
         assert result["contributor"] == "testuser"
         assert result["type"] == "Human"
         assert result["confidence"] == 0.95
 
+    @patch("rabbit.main.ONNXPredictor")
     @patch("rabbit.main.GitHubAPIExtractor")
     def test_process_contributor_returns_unknown_when_no_events(
-        self, mock_gh_extractor
+        self, mock_gh_extractor, mock_predictor
     ):
         """Test _process_single_contributor returns 'Unknown' when events are below min_events."""
 
@@ -80,46 +92,59 @@ class TestProcessSingleContributor:
         ]  # Simulate less than min_events
 
         result = _process_single_contributor(
-            "testuser", mock_gh_extractor, min_events=5
+            "testuser", mock_gh_extractor, predictor=mock_predictor, min_events=5
         )
 
         assert result["contributor"] == "testuser"
         assert result["type"] == "Unknown"
         assert result["confidence"] == "-"
 
+    @patch("rabbit.main.ONNXPredictor")
     @patch("rabbit.main.GitHubAPIExtractor")
-    def test_process_contributor_handles_not_found_error(self, mock_gh_extractor):
+    def test_process_contributor_handles_not_found_error(
+        self, mock_gh_extractor, mock_predictor
+    ):
         """Test _process_single_contributor handles NotFoundError correctly."""
         from rabbit.errors import NotFoundError
 
         mock_gh_extractor.query_events.side_effect = NotFoundError("User not found")
 
         result = _process_single_contributor(
-            "invaliduser", mock_gh_extractor, min_events=5
+            "invaliduser", mock_gh_extractor, predictor=mock_predictor, min_events=5
         )
 
         assert result["contributor"] == "invaliduser"
         assert result["type"] == "Invalid"
         assert result["confidence"] == "-"
 
+    @patch("rabbit.main.ONNXPredictor")
     @patch("rabbit.main.GitHubAPIExtractor")
-    def test_process_contributor_forwards_api_errors(self, mock_gh_extractor):
+    def test_process_contributor_forwards_api_errors(
+        self, mock_gh_extractor, mock_predictor
+    ):
         """Test _process_single_contributor forwards GitHubAPIError exceptions."""
         from rabbit.errors import RabbitErrors
 
         mock_gh_extractor.query_events.side_effect = RabbitErrors("API error")
 
         with pytest.raises(RabbitErrors):
-            _process_single_contributor("testuser", mock_gh_extractor, min_events=5)
+            _process_single_contributor(
+                "testuser", mock_gh_extractor, predictor=mock_predictor, min_events=5
+            )
 
+    @patch("rabbit.main.ONNXPredictor")
     @patch("rabbit.main.GitHubAPIExtractor")
-    def test_process_contributor_forwards_unexpected_errors(self, mock_gh_extractor):
+    def test_process_contributor_forwards_unexpected_errors(
+        self, mock_gh_extractor, mock_predictor
+    ):
         """Test _process_single_contributor forwards unexpected exceptions."""
 
         mock_gh_extractor.query_events.side_effect = Exception("Unexpected error")
 
         with pytest.raises(RabbitErrors):
-            _process_single_contributor("testuser", mock_gh_extractor, min_events=5)
+            _process_single_contributor(
+                "testuser", mock_gh_extractor, predictor=mock_predictor, min_events=5
+            )
 
 
 class TestRunRabbit:
@@ -151,7 +176,7 @@ class TestRunRabbit:
         # Results that will be saved should have 3 entries
         args, _ = mock_save.call_args
         assert len(args[0]) == 3  # all_results DataFrame has 3 rows
-        assert args[1] == "text"  # output_type
+        assert args[1] == "term"  # output_type
 
     @patch("rabbit.main._save_results")
     @patch("rabbit.main._process_single_contributor")

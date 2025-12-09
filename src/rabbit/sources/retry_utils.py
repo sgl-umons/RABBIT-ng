@@ -1,4 +1,7 @@
+import logging
 from ..errors import RetryableError
+
+logger = logging.getLogger(__name__)
 
 
 def retry(max_attempts: int = 3, delay: int = 10, backoff: float = 2.0):
@@ -28,16 +31,17 @@ def retry(max_attempts: int = 3, delay: int = 10, backoff: float = 2.0):
                     return func(*args, **kwargs)
 
                 except RetryableError as e:
-                    # TODO: replace print with proper logging
                     if attempt < max_attempts - 1:
-                        print(e, f"Retrying in {current_delay} seconds...")
+                        logger.info(f"{e} - Retrying in {current_delay} seconds...")
                         time.sleep(current_delay)
+                        logger.info("Retrying...")
                         current_delay *= backoff
                     else:
                         last_error = e
 
-            # TODO: replace print with proper logging
-            print(f"Max attempts reached. Function failed with error: {last_error}")
+            logger.error(
+                f"Max attempts reached. Function failed with error: {last_error}"
+            )
             raise last_error
 
         return wrapper
