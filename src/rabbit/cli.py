@@ -1,26 +1,40 @@
 import csv
+import io
+import os
 import sys
 from enum import Enum
 from pathlib import Path
 from typing import Annotated, Optional
 
-from rich import box
-from rich.console import Console, Group
-from rich.live import Live
+from rich import print
+from rich.console import Console
 from rich.logging import RichHandler
+from rich.text import Text
 from dotenv import load_dotenv
 
 import typer
 import logging
 
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from rich.table import Table
+from rich.theme import Theme
 
 from . import run_rabbit, RetryableError
 
 load_dotenv()
 
-console_ui = Console(stderr=True)
+custom_theme = Theme(
+    {
+        "header": "bold underline",
+        "login": "bold cyan",
+        "Bot": "red",
+        "Human": "green",
+    }
+)
+
+console_err = Console(stderr=True, no_color="NO_COLOR" in os.environ)
+console_out = Console(
+    stderr=False, theme=custom_theme, no_color="NO_COLOR" in os.environ, highlight=False
+)
 
 app = typer.Typer(
     help="RABBIT is an Activity Based Bot Identification Tool that identifies bots "
@@ -35,13 +49,14 @@ class OutputFormat(str, Enum):
 
 
 def setup_logger(debug: bool = False):
-    log_level = logging.DEBUG if debug else logging.INFO
+    # TODO: setup better log level management
+    log_level = logging.DEBUG if debug else logging.CRITICAL
     logging.basicConfig(
         level=log_level,
         format="%(name)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
-            RichHandler(console=console_ui, rich_tracebacks=True, show_path=False)
+            RichHandler(console=console_err, rich_tracebacks=True, show_path=False)
         ],
     )
 
@@ -67,80 +82,102 @@ def _get_all_contributors(
     return list(dict.fromkeys(contributors))
 
 
-class RabbitRenderer:
-    """
-    Class to render RABBIT progress and results in the terminal using Rich. (on stderr)
-    """
+class RabbitUI:
+    """Manages incremental display with progress bar for CLI output."""
 
-    def __init__(self, total_items: int, quiet: bool = False):
-        self.quiet = quiet
-        self.total_items = total_items
+    COLUMN_WIDTHS = {"login": 30, "type": 10, "confidence": 10}
 
-        self.progress = Progress(
+    def __init__(self, total: int, fmt: OutputFormat):
+        self.fmt = fmt
+        self.total = total
+        self._is_interactive = sys.stdout.isatty()
+
+        self._progress = Progress(
             SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
             BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TextColumn("• {task.completed}/{task.total}"),
-            console=console_ui,
+            TextColumn("{task.completed}/{task.total}"),
+            console=console_err,
             transient=True,
         )
-        self.task_id = self.progress.add_task("", total=self.total_items)
+        self._task_id = self._progress.add_task("Analyzing...", total=self.total)
 
-        if not self.quiet:
-            self.table = Table(box=box.ROUNDED)
-            self.table.add_column("Contributor", style="bold cyan", no_wrap=True)
-            self.table.add_column("Type")
-            self.table.add_column("Confidence", justify="right")
+    def __enter__(self):
+        self._progress.start()
+        self._print_header()
+        return self
 
-    def get_renderable(self):
-        if not self.quiet:
-            return Group(self.progress, self.table)
-        return self.progress
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._progress.stop()
 
-    def update(self, result: dict):
-        self.progress.advance(self.task_id)
-        if not self.quiet:
-            self.table.add_row(
-                result["contributor"],
-                result["type"],
-                f"{result['confidence']}",
-            )
+    def advance(self):
+        """Advance the progress bar by one step."""
+        self._progress.advance(self._task_id)
 
-    def stop(self):
-        self.progress.stop()
+    def print_row(self, result: dict):
+        """Print a single result row (CSV or terminal format)."""
+        content = (
+            self._format_csv_row(result)
+            if self.fmt == OutputFormat.CSV
+            else self._format_terminal_row(result)
+        )
+        self._output(content)
 
+    def _print_header(self):
+        """Print the header row."""
+        header = (
+            "contributor,type,confidence"
+            if self.fmt == OutputFormat.CSV
+            else self._build_terminal_header()
+        )
+        self._output(header)
 
-class DataWriter:
-    """
-    Class to write RABBIT results to stdout
-    """
+    def _format_csv_row(self, result: dict) -> str:
+        """Format a result as a CSV row."""
+        output = io.StringIO()
+        csv.writer(output).writerow(
+            [result["contributor"], result["type"], result["confidence"]]
+        )
+        return output.getvalue().strip()
 
-    def __init__(self, fmt: OutputFormat):
-        self.fmt = fmt
-        self.active = not sys.stdout.isatty()
-        self.output = sys.stdout
+    def _format_terminal_row(self, result: dict) -> Text:
+        """Format a result as a rich terminal row."""
+        login = result["contributor"]
+        rtype = result["type"]
+        confidence = result["confidence"]
 
-        if self.active:
-            if self.fmt == OutputFormat.CSV:
-                self.csv_writer = csv.DictWriter(
-                    sys.stdout, fieldnames=["contributor", "type", "confidence"]
-                )
-                self.csv_writer.writeheader()
-            else:  # TSV format
-                print("contributor\ttype\tconfidence")
-            sys.stdout.flush()
+        # Truncate login if too long
+        w_login = self.COLUMN_WIDTHS["login"]
+        display_login = f"{login[: w_login - 1]}…" if len(login) > w_login else login
 
-    def write(self, result: dict):
-        if not self.active:
-            return
-        if self.fmt == OutputFormat.CSV:
-            self.csv_writer.writerow(result)
+        text = Text()
+        text.append(f"{display_login:<{w_login}}", style="login")
+        text.append("  ")
+        text.append(f"{rtype:<{self.COLUMN_WIDTHS['type']}}", style=rtype)
+        text.append("  ")
+        text.append(f"{confidence:>{self.COLUMN_WIDTHS['confidence']}}")
+
+        return text
+
+    def _build_terminal_header(self) -> Text:
+        """Build the terminal header row."""
+        text = Text()
+        text.append(f"{'CONTRIBUTOR':<{self.COLUMN_WIDTHS['login']}}", style="header")
+        text.append("  ")
+        text.append(f"{'TYPE':<{self.COLUMN_WIDTHS['type']}}", style="header")
+        text.append("  ")
+        text.append(
+            f"{'CONFIDENCE':>{self.COLUMN_WIDTHS['confidence']}}", style="header"
+        )
+        return text
+
+    def _output(self, content):
+        """Write content to appropriate output stream."""
+        if self._is_interactive:
+            self._progress.console.print(content)
         else:
-            print(
-                f"{result['contributor']}\t{result['type']}\t{result['confidence']}",
-                file=self.output,
-            )
-        sys.stdout.flush()
+            print(content)
+            sys.stdout.flush()
 
 
 @app.command()
@@ -205,15 +242,6 @@ def cli(
         ),
     ] = 3,
     # ---- OUTPUTS ----
-    output_path: Annotated[
-        Optional[Path],
-        typer.Option(
-            "--output",
-            "-o",
-            help="Path to save the results.",
-            rich_help_panel="Output",
-        ),
-    ] = None,
     output_format: Annotated[
         OutputFormat,
         typer.Option(
@@ -224,24 +252,6 @@ def cli(
             rich_help_panel="Output",
         ),
     ] = OutputFormat.TERMINAL,
-    quiet: Annotated[
-        bool,
-        typer.Option(
-            "--quiet",
-            "-q",
-            help="Save/Report results on the fly.",
-            rich_help_panel="Output",
-        ),
-    ] = False,
-    verbose: Annotated[
-        bool,
-        typer.Option(
-            "--verbose",
-            "-v",
-            help="Show detailed features extraction.",
-            rich_help_panel="Output",
-        ),
-    ] = False,
     debug: Annotated[
         bool,
         typer.Option(
@@ -266,29 +276,19 @@ def cli(
     if key is None:
         logger.warning("No API key provided. Rate limits will be low (60/hr).")
 
-    renderer = RabbitRenderer(total_items=len(contributors), quiet=quiet)
-
-    writer = DataWriter(fmt=output_format)
-
     try:
-        rabbit_generator = run_rabbit(
-            contributors=contributors,
-            api_key=key,
-            min_events=min_events,
-            min_confidence=min_confidence,
-            max_queries=max_queries,
-            _verbose=verbose,
-        )
-        with Live(renderer.get_renderable(), console=console_ui) as live:
-            for result in rabbit_generator:
-                renderer.update(result)
-                writer.write(result)
+        with RabbitUI(len(contributors), output_format) as ui:
+            for result in run_rabbit(
+                contributors=contributors,
+                api_key=key,
+                min_events=min_events,
+                min_confidence=min_confidence,
+                max_queries=max_queries,
+            ):
+                ui.print_row(result)
 
-            if not renderer.quiet:
-                live.update(renderer.table)
-            else:
-                live.stop()
-            logger.info("RABBIT completed successfully.")
+                ui.advance()
+
     except RetryableError as e:
         logger.error(f"API rate limit or network issue: {e}")
         logger.info("Please try again later or provide a GitHub API key.")
