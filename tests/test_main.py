@@ -1,47 +1,12 @@
 from unittest.mock import patch
 
 import pytest
-import pandas as pd
 
 from rabbit.main import (
-    _save_results,
     _process_single_contributor,
     run_rabbit,
-    OutputFormat,
 )
 from rabbit.errors import RabbitErrors
-
-
-class TestSaveResults:
-    """Tests for the _save_results function."""
-
-    @pytest.fixture
-    def sample_data(self):
-        return pd.DataFrame(
-            [
-                {"contributor": "user1", "type": "Bot", "confidence": 0.9},
-                {"contributor": "user2", "type": "Human", "confidence": 1.0},
-            ]
-        )
-
-    def test_save_results_csv(self, sample_data, tmp_path):
-        """Test if results are saved correctly in CSV format."""
-        output_file = tmp_path / "results.csv"
-
-        _save_results(sample_data, OutputFormat.CSV, str(output_file))
-
-        assert output_file.exists()
-        df_res = pd.read_csv(output_file)
-        assert len(df_res) == 2
-        assert "user1" in df_res["contributor"].values
-
-    def test_print_results_term(self, capsys, sample_data):
-        """Test if results are printed in the console in text format."""
-        _save_results(sample_data, OutputFormat.TERMINAL, "")
-
-        captured = capsys.readouterr()
-        assert "user1" in captured.out
-        assert "Bot" in captured.out
 
 
 class TestProcessSingleContributor:
@@ -139,12 +104,8 @@ class TestProcessSingleContributor:
 class TestRunRabbit:
     """Tests for the run_rabbit function."""
 
-    @patch("rabbit.main._save_results")
     @patch("rabbit.main._process_single_contributor")
-    @patch("rabbit.main.track", side_effect=lambda x, description: x)
-    def test_run_rabbit_multiple_contributors(
-        self, _mock_track, mock_process, mock_save
-    ):
+    def test_run_rabbit_multiple_contributors(self, mock_process):
         """Test run_rabbit processes multiple contributors correctly."""
         sample_result = {
             "contributor": "testuser",
@@ -155,35 +116,12 @@ class TestRunRabbit:
 
         contributors = ["user1", "user2", "user3"]
 
-        run_rabbit(contributors)
+        results = list(run_rabbit(contributors))
 
+        assert len(results) == 3
         assert mock_process.call_count == 3
 
-        # Make sure results are stored once (default is not incremental)
-        mock_save.assert_called_once()
-
-        # Results that will be saved should have 3 entries
-        args, _ = mock_save.call_args
-        assert len(args[0]) == 3  # all_results DataFrame has 3 rows
-        assert args[1] == "term"  # output_type
-
-    @patch("rabbit.main._save_results")
-    @patch("rabbit.main._process_single_contributor")
-    @patch("rabbit.main.track", side_effect=lambda x, description: x)
-    def test_run_rabbit_incremental_output(self, _mock_track, mock_process, mock_save):
-        """Test run_rabbit with incremental output."""
-        sample_result = {
-            "contributor": "testuser",
-            "type": "Human",
-            "confidence": 0.95,
-        }
-        mock_process.return_value = sample_result
-
-        contributors = ["user1", "user2"]
-
-        run_rabbit(contributors, incremental=True)
-
-        assert mock_process.call_count == 2
-
-        # Make sure results are stored twice (incremental)
-        assert mock_save.call_count == 2
+        # Vérifier le contenu des résultats
+        for result in results:
+            assert result["type"] == "Human"
+            assert result["confidence"] == 0.95

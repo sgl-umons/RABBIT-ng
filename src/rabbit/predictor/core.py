@@ -54,7 +54,9 @@ def _compute_activity_sequences(events: list) -> list:
     return activities
 
 
-def predict_user_type(username: str, events: list, predictor: Predictor) -> tuple:
+def predict_user_type(
+    username: str, events: list, predictor: Predictor
+) -> tuple[str, float | str]:
     """
     Predict the user type (bot or human) based on the given events
     """
