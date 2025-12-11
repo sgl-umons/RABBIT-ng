@@ -28,12 +28,13 @@ custom_theme = Theme(
         "login": "bold cyan",
         "Bot": "red",
         "Human": "green",
+        "Unknown": "dim",
+        "Invalid": "dim yellow",
     }
 )
 
-console_err = Console(stderr=True, no_color="NO_COLOR" in os.environ)
-console_out = Console(
-    stderr=False, theme=custom_theme, no_color="NO_COLOR" in os.environ, highlight=False
+console_err = Console(
+    stderr=True, no_color="NO_COLOR" in os.environ, theme=custom_theme
 )
 
 app = typer.Typer(
@@ -48,9 +49,14 @@ class OutputFormat(str, Enum):
     CSV = "csv"
 
 
-def setup_logger(debug: bool = False):
-    # TODO: setup better log level management
-    log_level = logging.DEBUG if debug else logging.CRITICAL
+def setup_logger(verbose: int):
+    levels = [
+        logging.CRITICAL,  # 0 - default
+        logging.INFO,  # 1 - -v
+        logging.DEBUG,  # 2 - -vv
+    ]
+
+    log_level = levels[verbose]
     logging.basicConfig(
         level=log_level,
         format="%(name)s - %(message)s",
@@ -252,19 +258,20 @@ def cli(
             rich_help_panel="Output",
         ),
     ] = OutputFormat.TERMINAL,
-    debug: Annotated[
-        bool,
+    verbose: Annotated[
+        int,
         typer.Option(
-            "--debug",
-            envvar="RABBIT_DEBUG",
-            help="Enable debug logging.",
+            "--verbose",
+            "-v",
+            count=True,
+            help="Increase verbosity level (can be used multiple times. e.g -vv).",
             rich_help_panel="Output",
         ),
-    ] = False,
+    ] = 0,
 ):
     """Identify bot contributors based on their activity sequences in GitHub."""
 
-    setup_logger(debug)
+    setup_logger(verbose)
     logger = logging.getLogger("rabbit.cli")
 
     contributors = _get_all_contributors(contributors, input_file)
@@ -294,7 +301,9 @@ def cli(
         logger.info("Please try again later or provide a GitHub API key.")
         raise typer.Exit(code=2)
     except Exception as e:
-        logger.critical(f"Unexpected error: {e}", exc_info=debug)
+        logger.critical(
+            f"Unexpected error: {e}", exc_info=True if verbose > 0 else False
+        )
         raise typer.Exit(code=3)
 
 
