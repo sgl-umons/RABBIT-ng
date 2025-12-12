@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import Generator
 
 import requests
 
@@ -72,18 +73,16 @@ class GitHubAPIExtractor:
         )
         return self._handle_api_response(contributor, response)
 
-    def query_events(self, contributor):
-        events = []
-
+    def query_events(self, contributor: str) -> Generator[list[dict]]:
         page = 1
         while page <= self.max_queries:
             try:
                 page_events = self._query_event_page(contributor, page)
-                events.extend(page_events)
+
+                yield page_events
+
                 if not self._check_events_left(page_events):
                     break
                 page += 1
             except RateLimitExceededError as rate_limit_e:
                 rate_limit_e.wait_reset()
-
-        return events
