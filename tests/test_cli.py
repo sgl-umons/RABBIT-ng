@@ -64,7 +64,7 @@ class TestIntegration:
         """Charge le JSON depuis le fichier une seule fois pour les tests."""
         import json
 
-        data_file = Path(__file__).parent / "data" / "events_human.json"
+        data_file = Path(__file__).parent / "data" / "human_events.json"
         with open(data_file, "r", encoding="utf-8") as f:
             return json.load(f)
 

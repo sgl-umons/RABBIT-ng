@@ -15,7 +15,7 @@ class TestPredictor:
     def test_predict_human(self):
         import json
 
-        human_events_file = Path(__file__).parent.parent / "data" / "events_human.json"
+        human_events_file = Path(__file__).parent.parent / "data" / "human_events.json"
 
         with open(human_events_file, "r", encoding="utf-8") as f:
             human_events = json.load(f)
