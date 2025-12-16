@@ -70,7 +70,7 @@ def setup_logger(verbose: int):
 
 
 def _concat_all_contributors(
-    arg_contributors: list[str], input_file: Optional[Path]
+    arg_contributors: list[str] | None, input_file: Path | None
 ) -> list[str]:
     """Combine CLI arguments and file content into a unique list."""
     contributors = arg_contributors.copy() if arg_contributors else []
@@ -210,7 +210,7 @@ class RabbitUI:
 def cli(
     # ---- INPUTS ----
     contributors: Annotated[
-        list[str],
+        list[str] | None,
         typer.Argument(
             help="Login names of contributors to analyze.",
             show_default=False,

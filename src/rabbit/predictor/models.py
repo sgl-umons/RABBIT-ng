@@ -26,7 +26,7 @@ class Predictor(ABC):
             Abstract method to predict contributor type and confidence score.
     """
 
-    def __init__(self, model_path: str = None):
+    def __init__(self, model_path: str | None = None):
         self.model_path = model_path
         self.model = None
         self._load_model()
@@ -53,13 +53,13 @@ class Predictor(ABC):
 
 
 class ONNXPredictor(Predictor):
-    def __init__(self, model_path: str = None):
+    def __init__(self, model_path: str | None = None):
         self.input_name = None
         self.output_name = None
         super().__init__(
             model_path
             if model_path
-            else files("rabbit").joinpath("resources", "models", "bimbas.onnx")
+            else str(files("rabbit").joinpath("resources", "models", "bimbas.onnx"))
         )
 
     def _load_model(self):
@@ -80,6 +80,8 @@ class ONNXPredictor(Predictor):
     def predict(self, features: DataFrame) -> tuple[str, float]:
         input_data = features.values.astype("float32")
 
+        if self.model is None:
+            raise RuntimeError("Model is not loaded. Cannot perform prediction.")
         # Run inference
         outputs = self.model.run([self.output_name], {self.input_name: input_data})
 

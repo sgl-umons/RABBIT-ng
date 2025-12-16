@@ -58,7 +58,7 @@ def _process_single_contributor(
 
 def run_rabbit(
     contributors: list[str],
-    api_key: str = None,
+    api_key: str | None = None,
     min_events: int = 5,
     min_confidence: float = 1.0,
     max_queries: int = 3,
