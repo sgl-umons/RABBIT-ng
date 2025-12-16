@@ -28,29 +28,6 @@ class TestCLI:
         result = runner.invoke(app, [])
         assert result.exit_code != 0
 
-    def test_text_output(self, mock_run_rabbit):
-        result = runner.invoke(app, ["octocat"])
-
-        assert result.exit_code == 0
-        assert mock_run_rabbit.call_args.kwargs["output_type"] == "term"
-        assert mock_run_rabbit.call_args.kwargs["output_path"] == ""
-
-    def test_csv_output(self, mock_run_rabbit, tmp_path):
-        csv_file = tmp_path / "test_output.csv"
-        result = runner.invoke(app, ["octocat", "-f", "csv", "-o", str(csv_file)])
-
-        assert result.exit_code == 0
-        assert mock_run_rabbit.call_args.kwargs["output_type"] == "csv"
-        assert mock_run_rabbit.call_args.kwargs["output_path"] == str(csv_file)
-
-    def test_json_output(self, mock_run_rabbit, tmp_path):
-        json_file = tmp_path / "test_output.json"
-        result = runner.invoke(app, ["octocat", "-f", "json", "-o", str(json_file)])
-
-        assert result.exit_code == 0
-        assert mock_run_rabbit.call_args.kwargs["output_type"] == "json"
-        assert mock_run_rabbit.call_args.kwargs["output_path"] == str(json_file)
-
     def test_cli_extend_contributors_list_with_file(self, mock_run_rabbit, tmp_path):
         """Test if the list of the contributors is extended with the content of the input file."""
         # Create a temporary input file with contributor names
@@ -87,7 +64,7 @@ class TestIntegration:
         """Charge le JSON depuis le fichier une seule fois pour les tests."""
         import json
 
-        data_file = Path(__file__).parent / "data" / "events_human.json"
+        data_file = Path(__file__).parent / "data" / "human_events.json"
         with open(data_file, "r", encoding="utf-8") as f:
             return json.load(f)
 
@@ -104,27 +81,23 @@ class TestIntegration:
             status=200,
         )
 
-        result = runner.invoke(
-            app,
-            [
-                test_user,
-                "--key",
-                "valid_github_api_key_which_is_long_enough_1234567890",
-                "-f",
-                "json",
-                "-o",
-                f"/{tmp_path}/output.json",
-            ],
-        )
+        with patch("sys.stdout.isatty", return_value=False):
+            result = runner.invoke(
+                app,
+                [
+                    test_user,
+                    "--key",
+                    "valid_github_api_key_which_is_long_enough_1234567890",
+                    "-f",
+                    "csv",
+                ],
+            )
 
         assert result.exit_code == 0
+        lines = result.stdout.strip().split("\n")
+        assert len(lines) == 2  # Header + one result line
 
-        # Check if the output is saved in tmp_path
-        output_file = tmp_path / "output.json"
-        assert output_file.exists()
-        with open(output_file, "r", encoding="utf-8") as f:
-            output_data = f.read()
-        assert "testuser" in output_data  # Basic check to see if username is in
-        assert (
-            "Human" in output_data or "Bot" in output_data
-        )  # Check for classification
+        data_line = lines[1].split(",")
+        assert data_line[0] == test_user  # contributor
+        assert data_line[1] in ["Human", "Bot", "Unknown", "Invalid"]  # type
+        assert 0.0 <= float(data_line[2]) <= 1.0  # confidence

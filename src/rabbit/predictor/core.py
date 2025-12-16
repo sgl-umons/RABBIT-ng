@@ -1,5 +1,6 @@
 import contextlib
 import io
+from dataclasses import dataclass, field
 from importlib.resources import files
 import logging
 
@@ -7,13 +8,25 @@ from ghmap.mapping.activity_mapper import ActivityMapper
 from ghmap.mapping.action_mapper import ActionMapper
 from ghmap.utils import load_json_file
 
-from .features import compute_user_features
+from .features import ActivityFeatureExtractor
 from .models import Predictor
 
 logger = logging.getLogger(__name__)
 
 
-def _compute_activity_sequences(events: list) -> list:
+@dataclass
+class ContributorResult:
+    contributor: str
+    user_type: str = "Unknown"
+    confidence: float | str = "-"
+    features: dict[str, float] = field(default_factory=dict)
+
+    def __str__(self):
+        """By default, return a CSV representation of the result without features."""
+        return f"{self.contributor},{self.user_type},{self.confidence}"
+
+
+def compute_activity_sequences(events: list) -> list:
     """
     Compute activity sequences from the given events
 
@@ -54,16 +67,22 @@ def _compute_activity_sequences(events: list) -> list:
     return activities
 
 
-def predict_user_type(username: str, events: list, predictor: Predictor) -> tuple:
+def predict_user_type(
+    username: str, events: list, predictor: Predictor
+) -> ContributorResult:
     """
     Predict the user type (bot or human) based on the given events
     """
-    activities = _compute_activity_sequences(events)
+    activities = compute_activity_sequences(events)
     if len(activities) == 0:
         # Events where found but no activities could be computed
         logger.debug("No activity sequences found for user %s", username)
-        return "Unknown", "-"
+        return ContributorResult(username, "Unknown", "-")
 
-    features_df = compute_user_features(username, activities)
+    feature_extractor = ActivityFeatureExtractor(username, activities)
+    features_df = feature_extractor.compute_features()
 
-    return predictor.predict(features_df)
+    user_type, confidence = predictor.predict(features_df)
+
+    features_dict = features_df.iloc[0].to_dict() if not features_df.empty else {}
+    return ContributorResult(username, user_type, confidence, features_dict)

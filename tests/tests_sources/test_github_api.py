@@ -1,3 +1,4 @@
+import itertools
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
@@ -12,13 +13,6 @@ class TestGitHubAPIExtractor:
     def extractor(self):
         """Create a basic extractor instance for testing."""
         return GitHubAPIExtractor(api_key="test_api_key", max_queries=3)
-
-    @pytest.fixture
-    def mock_success(self):
-        mock_success = Mock()
-        mock_success.status_code = 200
-        mock_success.json.return_value = [{"id": i} for i in range(50)]
-        return mock_success
 
     def test_check_events_left_true(self):
         """Test _check_events_left returns True when 100 events."""
@@ -40,7 +34,7 @@ class TestGitHubAPIExtractor:
         mock_response.json.return_value = [{"id": 1}]
         mock_get.return_value = mock_response
 
-        extractor_no_key.query_events("testuser")
+        next(extractor_no_key.query_events("testuser"))
 
         _, kwargs = mock_get.call_args
         assert kwargs["headers"] == {}
@@ -55,7 +49,7 @@ class TestGitHubAPIExtractor:
         mock_response.json.return_value = [{"id": i} for i in range(50)]
         mock_get.return_value = mock_response
 
-        events = extractor.query_events(test_user)
+        events = list(itertools.chain.from_iterable(extractor.query_events(test_user)))
 
         # Check response is as expected
         assert len(events) == 50
@@ -89,7 +83,7 @@ class TestGitHubAPIExtractor:
 
         mock_get.side_effect = mock_responses
 
-        events = extractor.query_events(test_user)
+        events = list(itertools.chain.from_iterable(extractor.query_events(test_user)))
 
         # Check response is as expected
         assert len(events) == 300
@@ -98,6 +92,15 @@ class TestGitHubAPIExtractor:
 
         # Check that the request was made correct number of times
         assert mock_get.call_count == 3
+
+
+class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
+    @pytest.fixture
+    def mock_success(self):
+        mock_success = Mock()
+        mock_success.status_code = 200
+        mock_success.json.return_value = [{"id": i} for i in range(50)]
+        return mock_success
 
     @patch("rabbit.sources.github_api.requests.get")
     def test_handle_404_not_found(self, mock_get, extractor):
@@ -112,7 +115,7 @@ class TestGitHubAPIExtractor:
         mock_get.return_value = mock_response
 
         with pytest.raises(NotFoundError) as exc_info:
-            extractor.query_events(test_user)
+            next(extractor.query_events(test_user))
 
         assert test_user in str(exc_info.value)
 
@@ -134,7 +137,7 @@ class TestGitHubAPIExtractor:
 
         mock_get.side_effect = [mock_fail, mock_success]
 
-        result = extractor.query_events("testuser")
+        result = next(extractor.query_events("testuser"))
 
         assert len(result) == 50
         assert mock_sleep.call_count == 1
@@ -152,7 +155,7 @@ class TestGitHubAPIExtractor:
 
         mock_get.side_effect = [mock_fail, mock_success]
 
-        result = extractor.query_events("testuser")
+        result = next(extractor.query_events("testuser"))
 
         assert len(result) == 50
         assert mock_sleep.call_count == 1
@@ -197,6 +200,6 @@ class TestGitHubAPIExtractor:
         mock_get.return_value = mock_response
 
         with pytest.raises(APIRequestError) as exc_info:
-            extractor.query_events("testuser")
+            next(extractor.query_events("testuser"))
 
         assert "I'm a teapot" in str(exc_info.value)

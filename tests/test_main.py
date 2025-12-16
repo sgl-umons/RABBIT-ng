@@ -1,58 +1,13 @@
 from unittest.mock import patch
 
 import pytest
-import pandas as pd
 
 from rabbit.main import (
-    _save_results,
     _process_single_contributor,
     run_rabbit,
-    OutputFormat,
 )
 from rabbit.errors import RabbitErrors
-
-
-class TestSaveResults:
-    """Tests for the _save_results function."""
-
-    @pytest.fixture
-    def sample_data(self):
-        return pd.DataFrame(
-            [
-                {"contributor": "user1", "type": "Bot", "confidence": 0.9},
-                {"contributor": "user2", "type": "Human", "confidence": 1.0},
-            ]
-        )
-
-    def test_save_results_csv(self, sample_data, tmp_path):
-        """Test if results are saved correctly in CSV format."""
-        output_file = tmp_path / "results.csv"
-
-        _save_results(sample_data, OutputFormat.CSV, str(output_file))
-
-        assert output_file.exists()
-        df_res = pd.read_csv(output_file)
-        assert len(df_res) == 2
-        assert "user1" in df_res["contributor"].values
-
-    def test_save_results_json(self, sample_data, tmp_path):
-        """Test if results are saved correctly in JSON format."""
-        output_file = tmp_path / "results.json"
-
-        _save_results(sample_data, OutputFormat.JSON, str(output_file))
-
-        assert output_file.exists()
-        df_res = pd.read_json(output_file)
-        assert len(df_res) == 2
-        assert "user2" in df_res["contributor"].values
-
-    def test_print_results_term(self, capsys, sample_data):
-        """Test if results are printed in the console in text format."""
-        _save_results(sample_data, OutputFormat.TERMINAL, "")
-
-        captured = capsys.readouterr()
-        assert "user1" in captured.out
-        assert "Bot" in captured.out
+from rabbit.predictor import ContributorResult
 
 
 class TestProcessSingleContributor:
@@ -66,19 +21,49 @@ class TestProcessSingleContributor:
     ):
         """Test _process_single_contributor returns correct type and confidence."""
 
-        mock_gh_extractor.query_events.return_value = [{}] * 10  # Simulate 10 events
-        mock_predict.return_value = ("Human", 0.95)
+        mock_gh_extractor.query_events.return_value = [
+            [{"event": "test"}] * 10
+        ]  # Simulate 10 events
+        mock_predict.return_value = ContributorResult("testuser", "Human", 0.95)
 
         result = _process_single_contributor(
             "testuser",
             mock_gh_extractor,
             predictor=mock_predictor,
             min_events=5,
+            min_confidence=1,
         )
 
-        assert result["contributor"] == "testuser"
-        assert result["type"] == "Human"
-        assert result["confidence"] == 0.95
+        assert result.contributor == "testuser"
+        assert result.user_type == "Human"
+        assert result.confidence == 0.95
+
+    @patch("rabbit.main.ONNXPredictor")
+    @patch("rabbit.main.GitHubAPIExtractor")
+    @patch("rabbit.main.predict_user_type")
+    def test_process_contributor_with_more_than_100_event_minimum(
+        self, mock_predict, mock_gh_extractor, mock_predictor
+    ):
+        """Users can set the min_events parameter to more than 100, which requires multiple API calls."""
+        # Simulate 250 events returned in 3 pages
+        mock_gh_extractor.query_events.return_value = [
+            [{"event": "test"}] * 100,
+            [{"event": "test"}] * 100,
+            [{"event": "test"}] * 50,
+        ]
+        mock_predict.return_value = ContributorResult("testuser", "Bot", 0.90)
+
+        result = _process_single_contributor(
+            "testuser",
+            mock_gh_extractor,
+            predictor=mock_predictor,
+            min_events=200,
+            min_confidence=1,
+        )
+
+        assert result.contributor == "testuser"
+        assert result.user_type == "Bot"
+        assert result.confidence == 0.90
 
     @patch("rabbit.main.ONNXPredictor")
     @patch("rabbit.main.GitHubAPIExtractor")
@@ -92,16 +77,20 @@ class TestProcessSingleContributor:
         ]  # Simulate less than min_events
 
         result = _process_single_contributor(
-            "testuser", mock_gh_extractor, predictor=mock_predictor, min_events=5
+            "testuser",
+            mock_gh_extractor,
+            predictor=mock_predictor,
+            min_events=5,
+            min_confidence=1,
         )
 
-        assert result["contributor"] == "testuser"
-        assert result["type"] == "Unknown"
-        assert result["confidence"] == "-"
+        assert result.contributor == "testuser"
+        assert result.user_type == "Unknown"
+        assert result.confidence == "-"
 
     @patch("rabbit.main.ONNXPredictor")
     @patch("rabbit.main.GitHubAPIExtractor")
-    def test_process_contributor_handles_not_found_error(
+    def test_process_contributor_returns_invalid_when_not_found(
         self, mock_gh_extractor, mock_predictor
     ):
         """Test _process_single_contributor handles NotFoundError correctly."""
@@ -110,12 +99,51 @@ class TestProcessSingleContributor:
         mock_gh_extractor.query_events.side_effect = NotFoundError("User not found")
 
         result = _process_single_contributor(
-            "invaliduser", mock_gh_extractor, predictor=mock_predictor, min_events=5
+            "invaliduser",
+            mock_gh_extractor,
+            predictor=mock_predictor,
+            min_events=5,
+            min_confidence=1,
         )
 
-        assert result["contributor"] == "invaliduser"
-        assert result["type"] == "Invalid"
-        assert result["confidence"] == "-"
+        assert result.contributor == "invaliduser"
+        assert result.user_type == "Invalid"
+        assert result.confidence == "-"
+
+    @patch("rabbit.main.ONNXPredictor")
+    @patch("rabbit.main.GitHubAPIExtractor")
+    @patch("rabbit.main.predict_user_type")
+    def test_process_contributor_with_early_stopping(
+        self, mock_predict, mock_gh_extractor, mock_predictor
+    ):
+        """Test _process_single_contributor stops early when min_confidence is reached."""
+
+        # Simulate events returned in pages
+        mock_gh_extractor.query_events.return_value = [
+            [{"event": "test"}] * 100,
+            [{"event": "test"}] * 100,
+        ]
+
+        # First call returns low confidence, second call returns high confidence
+        mock_predict.side_effect = [
+            ContributorResult("testuser", "Human", 0.6),
+            ContributorResult("testuser", "Human", 0.95),
+        ]
+
+        result = _process_single_contributor(
+            "testuser",
+            mock_gh_extractor,
+            predictor=mock_predictor,
+            min_events=5,
+            min_confidence=0.5,
+        )
+
+        assert result.contributor == "testuser"
+        assert result.user_type == "Human"
+        assert result.confidence == 0.6
+
+        # Make sure that it was called only once
+        assert mock_gh_extractor.query_events.call_count == 1
 
     @patch("rabbit.main.ONNXPredictor")
     @patch("rabbit.main.GitHubAPIExtractor")
@@ -129,7 +157,11 @@ class TestProcessSingleContributor:
 
         with pytest.raises(RabbitErrors):
             _process_single_contributor(
-                "testuser", mock_gh_extractor, predictor=mock_predictor, min_events=5
+                "testuser",
+                mock_gh_extractor,
+                predictor=mock_predictor,
+                min_events=5,
+                min_confidence=1,
             )
 
     @patch("rabbit.main.ONNXPredictor")
@@ -143,19 +175,19 @@ class TestProcessSingleContributor:
 
         with pytest.raises(RabbitErrors):
             _process_single_contributor(
-                "testuser", mock_gh_extractor, predictor=mock_predictor, min_events=5
+                "testuser",
+                mock_gh_extractor,
+                predictor=mock_predictor,
+                min_events=5,
+                min_confidence=1,
             )
 
 
 class TestRunRabbit:
     """Tests for the run_rabbit function."""
 
-    @patch("rabbit.main._save_results")
     @patch("rabbit.main._process_single_contributor")
-    @patch("rabbit.main.track", side_effect=lambda x, description: x)
-    def test_run_rabbit_multiple_contributors(
-        self, _mock_track, mock_process, mock_save
-    ):
+    def test_run_rabbit_multiple_contributors(self, mock_process):
         """Test run_rabbit processes multiple contributors correctly."""
         sample_result = {
             "contributor": "testuser",
@@ -166,35 +198,12 @@ class TestRunRabbit:
 
         contributors = ["user1", "user2", "user3"]
 
-        run_rabbit(contributors)
+        results = list(run_rabbit(contributors))
 
+        assert len(results) == 3
         assert mock_process.call_count == 3
 
-        # Make sure results are stored once (default is not incremental)
-        mock_save.assert_called_once()
-
-        # Results that will be saved should have 3 entries
-        args, _ = mock_save.call_args
-        assert len(args[0]) == 3  # all_results DataFrame has 3 rows
-        assert args[1] == "term"  # output_type
-
-    @patch("rabbit.main._save_results")
-    @patch("rabbit.main._process_single_contributor")
-    @patch("rabbit.main.track", side_effect=lambda x, description: x)
-    def test_run_rabbit_incremental_output(self, _mock_track, mock_process, mock_save):
-        """Test run_rabbit with incremental output."""
-        sample_result = {
-            "contributor": "testuser",
-            "type": "Human",
-            "confidence": 0.95,
-        }
-        mock_process.return_value = sample_result
-
-        contributors = ["user1", "user2"]
-
-        run_rabbit(contributors, incremental=True)
-
-        assert mock_process.call_count == 2
-
-        # Make sure results are stored twice (incremental)
-        assert mock_save.call_count == 2
+        # Vérifier le contenu des résultats
+        for result in results:
+            assert result["type"] == "Human"
+            assert result["confidence"] == 0.95

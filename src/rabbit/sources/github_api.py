@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from collections.abc import Iterator
 
 import requests
 
@@ -9,6 +10,10 @@ from ..errors import (
     RetryableError,
 )
 from .retry_utils import retry
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class GitHubAPIExtractor:
@@ -26,6 +31,9 @@ class GitHubAPIExtractor:
     def _handle_api_response(contributor, response):
         match response.status_code:
             case 200:  # OK
+                logger.debug(
+                    f"GitHub API Rate Limit Remaining: {response.headers.get('x-ratelimit-remaining')}"
+                )
                 return response.json()
 
             case (
@@ -65,18 +73,16 @@ class GitHubAPIExtractor:
         )
         return self._handle_api_response(contributor, response)
 
-    def query_events(self, contributor):
-        events = []
-
+    def query_events(self, contributor: str) -> Iterator[list[dict]]:
         page = 1
         while page <= self.max_queries:
             try:
                 page_events = self._query_event_page(contributor, page)
-                events.extend(page_events)
+
+                yield page_events
+
                 if not self._check_events_left(page_events):
                     break
                 page += 1
             except RateLimitExceededError as rate_limit_e:
                 rate_limit_e.wait_reset()
-
-        return events
