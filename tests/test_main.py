@@ -232,11 +232,9 @@ class TestRunRabbit:
     @patch("rabbit.main._process_single_contributor")
     def test_run_rabbit_multiple_contributors(self, mock_process):
         """Test run_rabbit processes multiple contributors correctly."""
-        sample_result = {
-            "contributor": "testuser",
-            "type": "Human",
-            "confidence": 0.95,
-        }
+        sample_result = ContributorResult(
+            contributor="testuser", user_type="Human", confidence=0.95
+        )
         mock_process.return_value = sample_result
 
         contributors = ["user1", "user2", "user3"]
