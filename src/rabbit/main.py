@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Iterator
-from typing import Optional
+
 
 from .predictor.models import Predictor, ONNXPredictor
 from .sources import GitHubAPIExtractor
@@ -65,7 +65,7 @@ def _process_single_contributor(
 
 def run_rabbit(
     contributors: list[str],
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
     min_events: int = 5,
     min_confidence: float = 1.0,
     max_queries: int = 3,
