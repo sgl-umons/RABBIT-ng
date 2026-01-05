@@ -72,7 +72,7 @@ def run_rabbit(
     no_wait: bool = False,
 ) -> Iterator[ContributorResult]:
     """
-    Run rabbit on a list of contributors to determiner their type.
+    Run rabbit on a list of contributors to determine their type.
 
     This is the main entry point for using RABBIT as a library.
     It yields results incrementally, allowing to process contributors one at a time.

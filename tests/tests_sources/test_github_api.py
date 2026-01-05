@@ -147,6 +147,21 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
         assert "rate limit" in str(exc_info.value).lower()
 
     @patch("rabbit.sources.github_api.requests.get")
+    def test_query_user_type_handle_404_not_found(self, mock_get, extractor):
+        """Test if query_user_type() raises NotFoundError on 404."""
+        test_user = "nonexistentuser"
+
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.reason = "Not Found"
+        mock_get.return_value = mock_response
+
+        with pytest.raises(NotFoundError) as exc_info:
+            extractor.query_user_type(test_user)
+
+        assert test_user in str(exc_info.value)
+
+    @patch("rabbit.sources.github_api.requests.get")
     def test_query_events_handle_404_not_found(self, mock_get, extractor):
         """Test if query_events() raises NotFoundError on 404."""
         test_user = "nonexistentuser"
@@ -158,21 +173,6 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
 
         with pytest.raises(NotFoundError) as exc_info:
             next(extractor.query_events(test_user))
-
-        assert test_user in str(exc_info.value)
-
-    @patch("rabbit.sources.github_api.requests.get")
-    def test_query_events_handle_404_not_found_user_type(self, mock_get, extractor):
-        """Test if query_events() raises NotFoundError on 404."""
-        test_user = "nonexistentuser"
-
-        mock_response = Mock()
-        mock_response.status_code = 404
-        mock_response.reason = "Not Found"
-        mock_get.return_value = mock_response
-
-        with pytest.raises(NotFoundError) as exc_info:
-            extractor.query_user_type(test_user)
 
         assert test_user in str(exc_info.value)
 

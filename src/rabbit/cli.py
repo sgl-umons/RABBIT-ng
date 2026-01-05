@@ -3,7 +3,7 @@ import os
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -216,7 +216,7 @@ def cli(
         ),
     ] = None,
     input_file: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "--input-file",
             "-i",
@@ -230,7 +230,7 @@ def cli(
     ] = None,
     # ---- CONFIGURATION ----
     key: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--key",
             "-k",
@@ -338,10 +338,12 @@ def cli(
 
     except RetryableError as e:
         logger.error(f"Network issue occurred: {e}")
+        raise typer.Exit(code=2)
     except Exception as e:
         logger.critical(
             f"Unexpected error: {e}", exc_info=True if verbose > 0 else False
         )
+        raise typer.Exit(code=3)
 
 
 if __name__ == "__main__":
