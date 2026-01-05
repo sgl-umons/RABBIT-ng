@@ -1,6 +1,8 @@
 """Custom errors for API operations."""
 
 import logging
+from typing import Optional
+
 from requests import Response
 
 logger = logging.getLogger(__name__)
@@ -19,7 +21,7 @@ class RabbitErrors(Exception):
 class RateLimitExceededError(RabbitErrors):
     """Error raised when the API rate limit is exceeded."""
 
-    def __init__(self, reset_time: str | None = None):
+    def __init__(self, reset_time: Optional[str] = None):
         self.reset_time = reset_time
         message = "API rate limit exceeded."
         if reset_time:

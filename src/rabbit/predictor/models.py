@@ -7,6 +7,7 @@ an ONNX Runtime implementation that loads and runs the pre-trained BIMBAS model.
 
 from importlib.resources import files
 import logging
+from typing import Optional
 
 import numpy as np
 import onnxruntime
@@ -43,7 +44,7 @@ class Predictor(ABC):
         Human: 0.872
     """
 
-    def __init__(self, model_path: str | None = None):
+    def __init__(self, model_path: Optional[str] = None):
         self.model_path = model_path
         self.model = None
         self._load_model()
@@ -95,7 +96,7 @@ class ONNXPredictor(Predictor):
         Bot: 0.923
     """
 
-    def __init__(self, model_path: str | None = None):
+    def __init__(self, model_path: Optional[str] = None):
         self._input_name = None
         self._output_name = None
         super().__init__(
