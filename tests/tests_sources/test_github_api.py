@@ -5,7 +5,12 @@ from unittest.mock import Mock, patch
 import pytest
 
 from rabbit.sources import GitHubAPIExtractor
-from rabbit.errors import RetryableError
+from rabbit.errors import (
+    RetryableError,
+    RateLimitExceededError,
+    NotFoundError,
+    APIRequestError,
+)
 
 
 class TestGitHubAPIExtractor:
@@ -120,28 +125,30 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
         mock_success.json.return_value = [{"id": i} for i in range(50)]
         return mock_success
 
-    @patch("rabbit.sources.github_api.requests.get")
-    def test_handle_404_not_found(self, mock_get, extractor):
-        """Test if query_events() raises NotFoundError on 404."""
-        from rabbit.errors import NotFoundError
+    @pytest.fixture
+    def extractor_no_wait(self):
+        """Create an extractor instance with no_wait=True for testing."""
+        return GitHubAPIExtractor(api_key="test_api_key", max_queries=3, no_wait=True)
 
-        test_user = "nonexistentuser"
+    @patch("rabbit.sources.github_api.requests.get")
+    def test_query_user_type_handle_rate_limit_no_wait(
+        self, mock_get, extractor_no_wait
+    ):
+        """Test if query_user_type() raises RateLimitExceededError on rate limit when no_wait is True."""
 
         mock_response = Mock()
-        mock_response.status_code = 404
-        mock_response.reason = "Not Found"
+        mock_response.status_code = 403
+        mock_response.headers.get = lambda key: "10" if key == "retry-after" else None
         mock_get.return_value = mock_response
 
-        with pytest.raises(NotFoundError) as exc_info:
-            next(extractor.query_events(test_user))
+        with pytest.raises(RateLimitExceededError) as exc_info:
+            extractor_no_wait.query_user_type("testuser")
 
-        assert test_user in str(exc_info.value)
+        assert "rate limit" in str(exc_info.value).lower()
 
     @patch("rabbit.sources.github_api.requests.get")
-    def test_handle_404_not_found_user_type(self, mock_get, extractor):
-        """Test if query_events() raises NotFoundError on 404."""
-        from rabbit.errors import NotFoundError
-
+    def test_query_user_type_handle_404_not_found(self, mock_get, extractor):
+        """Test if query_user_type() raises NotFoundError on 404."""
         test_user = "nonexistentuser"
 
         mock_response = Mock()
@@ -155,12 +162,26 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
         assert test_user in str(exc_info.value)
 
     @patch("rabbit.sources.github_api.requests.get")
+    def test_query_events_handle_404_not_found(self, mock_get, extractor):
+        """Test if query_events() raises NotFoundError on 404."""
+        test_user = "nonexistentuser"
+
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.reason = "Not Found"
+        mock_get.return_value = mock_response
+
+        with pytest.raises(NotFoundError) as exc_info:
+            next(extractor.query_events(test_user))
+
+        assert test_user in str(exc_info.value)
+
+    @patch("rabbit.sources.github_api.requests.get")
     @patch("time.sleep")
     def test_handle_429_rate_limit_exceeded(
         self, mock_sleep, mock_get, extractor, mock_success
     ):
         """Test if query_events() raises RateLimitExceededError on rate limit exceeded."""
-
         future_time = int((datetime.now() + timedelta(hours=1)).timestamp())
         mock_fail = Mock()
         mock_fail.status_code = 429
@@ -180,7 +201,7 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
 
     @patch("rabbit.sources.github_api.requests.get")
     @patch("time.sleep")
-    def test_handle_403_rate_limit_with_retry_after(
+    def test_query_events_handle_403_rate_limit_with_retry_after(
         self, mock_sleep, mock_get, extractor, mock_success
     ):
         """Test if query_events() raises RateLimitExceededError on 403 with retry-after."""
@@ -196,10 +217,8 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
         assert mock_sleep.call_count == 1
         assert mock_get.call_count == 2
 
-    def test_handle_403_rate_limit_no_api_key(self, extractor):
+    def test_query_events_handle_403_rate_limit_no_api_key(self, extractor):
         """Test if RateLimitExceededError is raised on RateLimit errors without API key."""
-        from rabbit.errors import RateLimitExceededError
-
         extractor_no_key = GitHubAPIExtractor(api_key=None)
 
         mock_response = Mock()
@@ -215,6 +234,36 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
 
         assert "rate limit" in str(exc_info.value).lower()
 
+    @patch("rabbit.sources.github_api.requests.get")
+    def test_query_events_raises_api_request_error_on_unknown_status(
+        self, mock_get, extractor
+    ):
+        """Test if APIRequestError is raised on unknown status codes."""
+        mock_response = Mock()
+        mock_response.status_code = 418  # I'm a teapot
+        mock_response.reason = "I'm a teapot"
+        mock_get.return_value = mock_response
+
+        with pytest.raises(APIRequestError) as exc_info:
+            next(extractor.query_events("testuser"))
+
+        assert "I'm a teapot" in str(exc_info.value)
+
+    @patch("rabbit.sources.github_api.requests.get")
+    def test_query_events_handle_403_rate_limit_with_no_wait(
+        self, mock_get, extractor_no_wait
+    ):
+        """Test if query_events() raises RateLimitExceededError on 403 when no_wait is True."""
+        mock_fail = Mock()
+        mock_fail.status_code = 403
+        mock_fail.headers.get = lambda key: "10" if key == "retry-after" else None
+        mock_get.return_value = mock_fail
+
+        with pytest.raises(RateLimitExceededError) as exc_info:
+            next(extractor_no_wait.query_events("testuser"))
+
+        assert "rate limit" in str(exc_info.value).lower()
+
     @pytest.mark.parametrize(
         "status_code,reason,error_type",
         [
@@ -226,7 +275,7 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
     )
     @patch("rabbit.sources.github_api.requests.get")
     @patch("time.sleep")
-    def test_handle_retryable_errors(
+    def test_query_events_page_handle_retryable_errors(
         self, mock_sleep, mock_get, extractor, status_code, reason, error_type
     ):
         """Test all retryable errors (500/504/408) raise RetryableError."""
@@ -237,23 +286,8 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
         mock_get.return_value = mock_response
 
         with pytest.raises(error_type) as exc_info:
-            extractor._query_event_page("testuser", 1)
+            next(extractor.query_events("testuser"))
 
         assert reason in str(exc_info.value)
         assert mock_get.call_count == 3  # retries
         assert mock_sleep.call_count == 2  # sleeps between retries
-
-    @patch("rabbit.sources.github_api.requests.get")
-    def test_raises_api_request_error_on_unknown_status(self, mock_get, extractor):
-        """Test if APIRequestError is raised on unknown status codes."""
-        from rabbit.errors import APIRequestError
-
-        mock_response = Mock()
-        mock_response.status_code = 418  # I'm a teapot
-        mock_response.reason = "I'm a teapot"
-        mock_get.return_value = mock_response
-
-        with pytest.raises(APIRequestError) as exc_info:
-            next(extractor.query_events("testuser"))
-
-        assert "I'm a teapot" in str(exc_info.value)

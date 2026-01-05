@@ -134,6 +134,7 @@ The simplest way to use RABBIT is to provide a list of GitHub usernames (e.g. ra
 │ --min-events              INTEGER RANGE [1<=x<=300]  Min number of events required. [default: 5]              │
 │ --min-confidence          FLOAT RANGE [0.0<=x<=1.0]  Confidence threshold to stop querying. [default: 1.0]    │
 │ --max-queries             INTEGER RANGE [1<=x<=3]    Max API queries per contributor. [default: 3]            │
+│ --no-wait                                            Do not wait when rate limit is reached; exit immediately.│
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ Output ──────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ --features                      Display computed features for each contributor.                               │
@@ -186,7 +187,7 @@ $ rabbit --input-file logins.txt -vv # Show debug messages
 
 #### Method A: Install in a project using uv
 If your project does not already use `uv`, you can initialize it first by running `uv init` in your project directory.
-More information can be found in the [official documentation](https://docs.astral.sh/uv/guides/projects/#pyprojecttoml)
+More information can be found in the [official documentation](https://docs.astral.sh/uv/guides/projects/#pyprojecttoml).
 
 Then, you can add RABBIT as a dependency:
 ```shell
@@ -220,6 +221,7 @@ for result in run_rabbit(
     min_events=5,
     min_confidence=1.0,
     max_queries=3,
+    no_wait=False
 ):
     # Each result is an ContributorResult object with 'contributor', 'type', 'confidence', and 'features' attributes
     print(f"{result.contributor}: {result.user_type} (Confidence: {result.confidence})")

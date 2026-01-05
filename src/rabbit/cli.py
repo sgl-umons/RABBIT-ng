@@ -3,7 +3,7 @@ import os
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -61,7 +61,7 @@ def setup_logger(verbose: int):
         format="%(name)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
-            RichHandler(console=console_err, rich_tracebacks=True, show_path=False)
+            RichHandler(console=console_err, rich_tracebacks=True, show_path=False),
         ],
     )
 
@@ -216,7 +216,7 @@ def cli(
         ),
     ] = None,
     input_file: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "--input-file",
             "-i",
@@ -230,7 +230,7 @@ def cli(
     ] = None,
     # ---- CONFIGURATION ----
     key: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--key",
             "-k",
@@ -266,6 +266,14 @@ def cli(
             rich_help_panel="Configuration",
         ),
     ] = 3,
+    no_wait: Annotated[
+        bool,
+        typer.Option(
+            "--no-wait",
+            help="Do not wait when rate limit is reached; exit immediately.",
+            rich_help_panel="Configuration",
+        ),
+    ] = False,
     # ---- OUTPUTS ----
     display_features: Annotated[
         bool,
@@ -322,6 +330,7 @@ def cli(
                 min_events=min_events,
                 min_confidence=min_confidence,
                 max_queries=max_queries,
+                no_wait=no_wait,
             ):
                 ui.print_row(result)
 

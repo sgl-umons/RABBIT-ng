@@ -69,9 +69,10 @@ def run_rabbit(
     min_events: int = 5,
     min_confidence: float = 1.0,
     max_queries: int = 3,
+    no_wait: bool = False,
 ) -> Iterator[ContributorResult]:
     """
-    Run rabbit on a list of contributors to determiner their type.
+    Run rabbit on a list of contributors to determine their type.
 
     This is the main entry point for using RABBIT as a library.
     It yields results incrementally, allowing to process contributors one at a time.
@@ -82,6 +83,7 @@ def run_rabbit(
         min_events: Minimum number of events required to make a prediction.
         min_confidence: Confidence threshold (0.0-1.0). Stop querying once reached.
         max_queries: Maximum number of API queries per contributor (max 300 events).
+        no_wait: If True, do not wait for rate limit reset, raise error instead.
 
     Yields:
         ContributorResult: The result for each contributor.
@@ -96,7 +98,9 @@ def run_rabbit(
         >>>     print(f"{result.contributor}: {result.user_type} ({result.confidence})")
         alice: Human (0.95)
     """
-    gh_api_client = GitHubAPIExtractor(api_key=api_key, max_queries=max_queries)
+    gh_api_client = GitHubAPIExtractor(
+        api_key=api_key, max_queries=max_queries, no_wait=no_wait
+    )
 
     try:
         predictor = ONNXPredictor()
