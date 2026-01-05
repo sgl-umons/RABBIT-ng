@@ -61,7 +61,7 @@ def setup_logger(verbose: int):
         format="%(name)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
-            RichHandler(console=console_err, rich_tracebacks=True, show_path=False)
+            RichHandler(console=console_err, rich_tracebacks=True, show_path=False),
         ],
     )
 
@@ -266,6 +266,14 @@ def cli(
             rich_help_panel="Configuration",
         ),
     ] = 3,
+    no_wait: Annotated[
+        bool,
+        typer.Option(
+            "--no-wait",
+            help="Do not wait when rate limit is reached; exit immediately.",
+            rich_help_panel="Configuration",
+        ),
+    ] = False,
     # ---- OUTPUTS ----
     display_features: Annotated[
         bool,
@@ -322,6 +330,7 @@ def cli(
                 min_events=min_events,
                 min_confidence=min_confidence,
                 max_queries=max_queries,
+                no_wait=no_wait,
             ):
                 ui.print_row(result)
 
@@ -329,12 +338,10 @@ def cli(
 
     except RetryableError as e:
         logger.error(f"Network issue occurred: {e}")
-        raise typer.Exit(code=2)
     except Exception as e:
         logger.critical(
             f"Unexpected error: {e}", exc_info=True if verbose > 0 else False
         )
-        raise typer.Exit(code=3)
 
 
 if __name__ == "__main__":

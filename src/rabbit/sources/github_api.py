@@ -29,10 +29,12 @@ class GitHubAPIExtractor:
             lower (60 requests/hour vs 5000/hour).
         max_queries: Maximum number of API pages to fetch per contributor.
             Each page contains up to 100 events.
+        no_wait: If True, do not wait for rate limit reset, raise error instead.
 
     Attributes:
         api_key: The GitHub API token for authenticated requests.
         max_queries: Maximum number of pages to query.
+        no_wait: Whether to wait for rate limit reset or raise error.
         query_root: Base URL for GitHub API (https://api.github.com).
 
     Example:
@@ -43,9 +45,10 @@ class GitHubAPIExtractor:
         Fetched 100 events
     """
 
-    def __init__(self, api_key=None, max_queries=3):
+    def __init__(self, api_key=None, max_queries=3, no_wait=False):
         self.api_key = api_key
         self.max_queries = max_queries
+        self.no_wait = no_wait
 
         self.query_root = "https://api.github.com"
 
@@ -127,8 +130,14 @@ class GitHubAPIExtractor:
             headers={"Authorization": f"token {self.api_key}"} if self.api_key else {},
             timeout=30,
         )
-        user_data = self._handle_api_response(contributor, response)
-        return user_data.get("type", "Unknown")
+        try:
+            user_data = self._handle_api_response(contributor, response)
+            return user_data.get("type", "Unknown")
+        except RateLimitExceededError as rate_limit_e:
+            if self.no_wait or not rate_limit_e.reset_time:
+                raise
+            rate_limit_e.wait_reset()
+            return self.query_user_type(contributor)
 
     def query_events(self, contributor: str) -> Iterator[list[dict]]:
         """
@@ -137,6 +146,7 @@ class GitHubAPIExtractor:
         This method queries the GitHub API incrementally, allowing callers to
         stop early once sufficient data is collected. Rate limit errors are
         handled automatically by waiting until the limit resets.
+        (Or raising an error if `no_wait` is True).
 
         The method stops querying automatically when either:
         - The maximum number of queries (`max_queries`) is reached.
@@ -154,7 +164,7 @@ class GitHubAPIExtractor:
             NotFoundError: If the contributor does not exist.
             RetryableError: If network errors persist after retries.
             RateLimitExceededError: If rate limit is hit and reset time is
-                unknown (typically when no API key is provided).
+                unknown (typically when no API key is provided) or when `no_wait` is True.
 
         Example:
             >>> extractor = GitHubAPIExtractor(api_key="token", max_queries=3)
@@ -173,6 +183,6 @@ class GitHubAPIExtractor:
                     break
                 page += 1
             except RateLimitExceededError as rate_limit_e:
-                if not rate_limit_e.reset_time:
+                if self.no_wait or not rate_limit_e.reset_time:
                     raise
                 rate_limit_e.wait_reset()
