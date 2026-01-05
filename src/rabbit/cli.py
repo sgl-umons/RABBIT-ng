@@ -50,7 +50,7 @@ class OutputFormat(str, Enum):
 
 def setup_logger(verbose: int):
     levels = [
-        logging.ERROR,  # 0 - default
+        logging.CRITICAL,  # 0 - default
         logging.INFO,  # 1 - -v
         logging.DEBUG,  # 2 - -vv
     ]
