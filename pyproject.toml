@@ -10,7 +10,7 @@ dependencies = [
     "ghmap>=2.0.2",
     "numpy>=2.3.5, <3.0.0",
     "onnxruntime>=1.23.2, <2.0.0",
-    "pandas>=2.3.3, <3.0.0",
+    "pandas>=2.3.3,<4.0.0",
     "python-dotenv>=1.2.1, <2.0.0",
     "requests>=2.32.5, <3.0.0",
     "typer>=0.20.0",
@@ -25,7 +25,7 @@ rabbit-ng = "rabbit_ng.cli:app"
 
 [dependency-groups]
 dev = [
-    "pandas-stubs>=2.3.3, <3.0.0.260204",
+    "pandas-stubs>=2.3.3,<3.0.0.260205",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
     "responses>=0.25.8",
