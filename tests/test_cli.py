@@ -5,7 +5,7 @@ import pytest
 import responses
 from typer.testing import CliRunner
 
-from rabbit.cli import app
+from rabbit_ng.cli import app
 
 runner = CliRunner()
 
@@ -14,7 +14,7 @@ class TestCLI:
     @pytest.fixture
     def mock_run_rabbit(self):
         """Mock run_rabbit to verify parameters are passed correctly."""
-        with patch("rabbit.cli.run_rabbit") as mock:
+        with patch("rabbit_ng.cli.run_rabbit") as mock:
             yield mock
 
     def test_app_help(self):

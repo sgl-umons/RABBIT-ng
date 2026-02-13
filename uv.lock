@@ -516,8 +516,8 @@ wheels = [
 ]
 
 [[package]]
-name = "rabbit"
-version = "3.0.0rc5"
+name = "rabbit-ng"
+version = "3.0.0rc6"
 source = { editable = "." }
 dependencies = [
     { name = "ghmap" },

@@ -308,10 +308,10 @@ def cli(
     RABBIT is an Activity Based Bot Identification Tool that identifies bots
     based on their recent activities in GitHub.
 
-    The simplest way to use RABBIT is to provide a list of GitHub usernames (e.g. rabbit user1 user2 ...)
+    The simplest way to use RABBIT is to provide a list of GitHub usernames (e.g. rabbit-ng user1 user2 ...)
     """
     setup_logger(verbose)
-    logger = logging.getLogger("rabbit.cli")
+    logger = logging.getLogger("rabbit_ng.cli")
 
     contributors = _concat_all_contributors(contributors, input_file)
     if len(contributors) == 0:

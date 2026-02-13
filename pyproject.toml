@@ -1,6 +1,6 @@
 [project]
-name = "rabbit"
-version = "3.0.0rc5"
+name = "rabbit-ng"
+version = "3.0.0rc6"
 license = {text = "Apache-2.0"}
 description = "GitHub bot identification tool based on activity sequences"
 readme = {file = "README.md", content-type = "text/markdown"}
@@ -21,7 +21,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
-rabbit = "rabbit.cli:app"
+rabbit-ng = "rabbit_ng.cli:app"
 
 [dependency-groups]
 dev = [
@@ -34,7 +34,7 @@ dev = [
 ]
 
 [tool.ruff]
-src = ["rabbit", "tests"]
+src = ["rabbit_ng", "tests"]
 
 [tool.ruff.lint]
 # allow unused imports in __init__.py files
@@ -42,7 +42,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
 
 [tool.coverage.run]
 branch = true
-source = ["rabbit"]
+source = ["rabbit_ng"]
 omit = [
     "*/__init__.py",
 ]

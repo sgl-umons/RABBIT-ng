@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from rabbit.predictor.features import ActivityFeatureExtractor
+from rabbit_ng.predictor.features import ActivityFeatureExtractor
 
 
 class TestValidation:

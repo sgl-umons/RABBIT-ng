@@ -13,7 +13,7 @@ from .predictor import ContributorResult
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
-__version__ = importlib.metadata.version("rabbit")
+__version__ = importlib.metadata.version("rabbit_ng")
 
 
 __all__ = [

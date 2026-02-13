@@ -61,7 +61,7 @@ it can predict **thousands of accounts per hour** without reaching GitHub's impo
 This installs RABBIT in an isolated environment, keeping your system clean.  
 You can find more details on how to install `uv` in its [official documentation](https://docs.astral.sh/uv/getting-started/installation).
 ```shell
-$ uv tool install rabbit
+$ uv tool install rabbit-ng
 ```
 
 #### Option B: Using pip in a virtual environment
@@ -71,7 +71,7 @@ It's recommended to use a virtual environment to avoid conflicts with other pack
 $ python3 -m venv rabbit-env
 $ source rabbit-env/bin/activate  # On Windows use `rabbit-env\Scripts\activate`
 # Install RABBIT
-$ pip install rabbit
+$ pip install rabbit-ng
 ```
 
 #### Option C: Using Nix
@@ -103,7 +103,7 @@ GITHUB_API_KEY=your_token_here
 #### Option B: Command-Line Argument
 You can also provide the API key directly when running RABBIT using the `--key` argument.
 ```shell
-$ rabbit --key your_token_here <other_arguments>
+$ rabbit-ng --key your_token_here <other_arguments>
 ```
 
 ### Available Commands
@@ -111,12 +111,12 @@ By default, RABBIT allows you to provide a list of GitHub contributor login name
 You can then provide different options to customize the analysis. The different available commands are:
 
 ```shell
-$ rabbit --help
-Usage: rabbit [OPTIONS] [CONTRIBUTORS]...                                                                       
+$ rabbit-ng --help
+Usage: rabbit-ng [OPTIONS] [CONTRIBUTORS]...                                                                       
                                                                                                                  
 RABBIT is an Activity Based Bot Identification Tool that identifies bots based on their recent activities in GitHub.                                                                                                                                                                                               
                                                                                                                                                                                                                                                                                                                     
-The simplest way to use RABBIT is to provide a list of GitHub usernames (e.g. rabbit user1 user2 ...)                                    
+The simplest way to use RABBIT is to provide a list of GitHub usernames (e.g. rabbit-ng user1 user2 ...)                                    
                                                                                                                  
 ╭─ Arguments ───────────────────────────────────────────────────────────────────────────────────────────────────╮
 │   contributors      [CONTRIBUTORS]...  Login names of contributors to analyze (Ex: 'user1 user2 ...').        │
@@ -150,7 +150,7 @@ The simplest way to use RABBIT is to provide a list of GitHub usernames (e.g. ra
 **1 - Simple example**  
 You can provide the contributor login names as positional arguments or in an input file. (Can be combined.)
 ```shell
-$ rabbit natarajan-chidambaram "github-actions[bot]" tensorflow-jenkins astral-sh inactiveUser notFoundUser
+$ rabbit-ng natarajan-chidambaram "github-actions[bot]" tensorflow-jenkins astral-sh inactiveUser notFoundUser
 CONTRIBUTOR                     TYPE          CONFIDENCE
 natarajan-chidambaram           Human               0.96
 github-actions[bot]             Bot                  1.0
@@ -162,19 +162,19 @@ notFoundUser                    Invalid                -
 
 **2 - Export results to CSV file**
 ```shell
-$ rabbit tensorflow-jenkins --input-file logins.txt --format csv > results.csv
+$ rabbit-ng tensorflow-jenkins --input-file logins.txt --format csv > results.csv
 ```
 
 **3 - Export with feature values**
 ```shell
-$ rabbit --input-file logins.txt --features > results_with_features.txt
+$ rabbit-ng --input-file logins.txt --features > results_with_features.txt
 ```
 
 **4 - Increase verbosity level**  
 By default, only **Error** messages are shown.
 ```shell
-$ rabbit --input-file logins.txt -v  # Show info and warning messages
-$ rabbit --input-file logins.txt -vv # Show debug messages
+$ rabbit-ng --input-file logins.txt -v  # Show info and warning messages
+$ rabbit-ng --input-file logins.txt -vv # Show debug messages
 ```
 
 ---
@@ -191,7 +191,7 @@ More information can be found in the [official documentation](https://docs.astra
 
 Then, you can add RABBIT as a dependency:
 ```shell
-$ uv add rabbit
+$ uv add rabbit-ng
 ```
 
 #### Method B: Install using pip in a virtual environment
@@ -201,27 +201,27 @@ If your project does not already have a virtual environment, it's recommended to
 $ python3 -m venv rabbit-env
 $ source rabbit-env/bin/activate  # On Windows use `rabbit-env\Scripts\activate`
 # Install RABBIT
-$ pip install rabbit
+$ pip install rabbit-ng
 ```
 
 ### Default usage
 The main function to use is `run_rabbit` which is an iterator yielding result for each contributor one by one.
+
 ```python
-from rabbit import run_rabbit 
+from rabbit_ng import run_rabbit
 from dotenv import load_dotenv
 import os
-
 
 load_dotenv()  # Load GITHUB_API_KEY from .env file if present
 API_KEY = os.getenv('GITHUB_API_KEY')
 
 for result in run_rabbit(
-    contributors=['MrRose765', 'github-actions[bot]'],
-    api_key=API_KEY,
-    min_events=5,
-    min_confidence=1.0,
-    max_queries=3,
-    no_wait=False
+        contributors=['MrRose765', 'github-actions[bot]'],
+        api_key=API_KEY,
+        min_events=5,
+        min_confidence=1.0,
+        max_queries=3,
+        no_wait=False
 ):
     # Each result is an ContributorResult object with 'contributor', 'type', 'confidence', and 'features' attributes
     print(f"{result.contributor}: {result.user_type} (Confidence: {result.confidence})")
@@ -234,20 +234,21 @@ for result in run_rabbit(
 You can also use RABBIT on events data you have already collected, without making any API calls.
 
 In that case, you need to provide a list of events for each contributor as input and write a custom function to use RABBIT:
+
 ```python
-from rabbit.predictor import ONNXPredictor, predict_user_type
+from rabbit_ng.predictor import ONNXPredictor, predict_user_type
 
 events = {
-    'MrRose765': [ 
+    'MrRose765': [
         # List of event dictionaries for MrRose765 ONLY
     ],
-    'testuser': [ 
+    'testuser': [
         # List of event dictionaries for testuser ONLY
     ],
 }
 
 # Load the pre-trained model
-predictor = ONNXPredictor() # Default model path is used, you can provide a custom path if needed.
+predictor = ONNXPredictor()  # Default model path is used, you can provide a custom path if needed.
 
 for contributor, user_events in events.items():
     result = predict_user_type(
@@ -324,8 +325,8 @@ Also, make sure to clearly document **why** the changes are necessary in the com
 We use `uv` for managing the development environment.
 ```shell
 # Clone the repository (must be your fork if you plan to contribute)
-$ git clone https://github.com/sgl-umons/RABBIT.git
-$ cd RABBIT
+$ git clone https://github.com/sgl-umons/RABBIT-ng.git
+$ cd RABBIT-ng
 
 # Install development dependencies
 $ uv sync --dev

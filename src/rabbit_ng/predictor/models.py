@@ -101,7 +101,7 @@ class ONNXPredictor(Predictor):
         super().__init__(
             model_path
             if model_path
-            else str(files("rabbit").joinpath("resources", "models", "bimbas.onnx"))
+            else str(files("rabbit_ng").joinpath("resources", "models", "bimbas.onnx"))
         )
 
     def _load_model(self):

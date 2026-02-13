@@ -1,6 +1,6 @@
 import pytest
 
-from rabbit.predictor.models import ONNXPredictor
+from rabbit_ng.predictor.models import ONNXPredictor
 import os
 import pandas as pd
 

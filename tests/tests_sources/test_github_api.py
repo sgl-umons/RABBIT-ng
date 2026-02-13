@@ -4,8 +4,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from rabbit.sources import GitHubAPIExtractor
-from rabbit.errors import (
+from rabbit_ng.sources import GitHubAPIExtractor
+from rabbit_ng.errors import (
     RetryableError,
     RateLimitExceededError,
     NotFoundError,
@@ -29,7 +29,7 @@ class TestGitHubAPIExtractor:
         events = [{"id": i} for i in range(50)]
         assert GitHubAPIExtractor._check_events_left(events) is False
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     def test_query_user_type(self, mock_get, extractor):
         """Test if query_user_type returns correct user type."""
 
@@ -47,7 +47,7 @@ class TestGitHubAPIExtractor:
         args, _ = mock_get.call_args
         assert test_user in args[0]
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     def test_query_events_without_api_key(self, mock_get):
         """Test if _query_event_page works without API key."""
         extractor_no_key = GitHubAPIExtractor(api_key=None)
@@ -62,7 +62,7 @@ class TestGitHubAPIExtractor:
         _, kwargs = mock_get.call_args
         assert kwargs["headers"] == {}
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     def test_query_events_single_page(self, mock_get, extractor):
         """Test if _query_event_page handles request parameters correctly."""
         test_user = "testuser"
@@ -85,7 +85,7 @@ class TestGitHubAPIExtractor:
         assert kwargs["params"]["page"] == 1
         assert kwargs["params"]["per_page"] == 100
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     def test_query_events_all_pages(self, mock_get, extractor):
         """Test if query_events handles multiple pages correctly."""
         test_user = "testuser"
@@ -130,7 +130,7 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
         """Create an extractor instance with no_wait=True for testing."""
         return GitHubAPIExtractor(api_key="test_api_key", max_queries=3, no_wait=True)
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     def test_query_user_type_handle_rate_limit_no_wait(
         self, mock_get, extractor_no_wait
     ):
@@ -146,7 +146,7 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
 
         assert "rate limit" in str(exc_info.value).lower()
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     def test_query_user_type_handle_404_not_found(self, mock_get, extractor):
         """Test if query_user_type() raises NotFoundError on 404."""
         test_user = "nonexistentuser"
@@ -161,7 +161,7 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
 
         assert test_user in str(exc_info.value)
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     def test_query_events_handle_404_not_found(self, mock_get, extractor):
         """Test if query_events() raises NotFoundError on 404."""
         test_user = "nonexistentuser"
@@ -176,7 +176,7 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
 
         assert test_user in str(exc_info.value)
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     @patch("time.sleep")
     def test_handle_429_rate_limit_exceeded(
         self, mock_sleep, mock_get, extractor, mock_success
@@ -199,7 +199,7 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
         assert mock_sleep.call_count == 1
         assert mock_get.call_count == 2
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     @patch("time.sleep")
     def test_query_events_handle_403_rate_limit_with_retry_after(
         self, mock_sleep, mock_get, extractor, mock_success
@@ -227,14 +227,14 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
         mock_response.headers.get = lambda key: None
 
         with patch(
-            "rabbit.sources.github_api.requests.get", return_value=mock_response
+            "rabbit_ng.sources.github_api.requests.get", return_value=mock_response
         ):
             with pytest.raises(RateLimitExceededError) as exc_info:
                 next(extractor_no_key.query_events("testuser"))
 
         assert "rate limit" in str(exc_info.value).lower()
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     def test_query_events_raises_api_request_error_on_unknown_status(
         self, mock_get, extractor
     ):
@@ -249,7 +249,7 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
 
         assert "I'm a teapot" in str(exc_info.value)
 
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     def test_query_events_handle_403_rate_limit_with_no_wait(
         self, mock_get, extractor_no_wait
     ):
@@ -273,7 +273,7 @@ class TestGitHubAPIExtractorAPIResponses(TestGitHubAPIExtractor):
             (429, "Too Many Requests", RetryableError),
         ],
     )
-    @patch("rabbit.sources.github_api.requests.get")
+    @patch("rabbit_ng.sources.github_api.requests.get")
     @patch("time.sleep")
     def test_query_events_page_handle_retryable_errors(
         self, mock_sleep, mock_get, extractor, status_code, reason, error_type
