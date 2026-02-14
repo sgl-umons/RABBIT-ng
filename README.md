@@ -5,10 +5,11 @@
        alt="RABBIT logo"
        width="400" />
 
+[![License](https://badgen.net/pypi/license/rabbit-ng)](https://github.com/sgl-umons/rabbit-ng/blob/master/LICENSE)
 [![Tests](https://github.com/sgl-umons/RABBIT-ng/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/sgl-umons/RABBIT-ng/actions/workflows/test.yml)
 [![Last commit](https://badgen.net/github/last-commit/sgl-umons/RABBIT-ng)](https://github.com/sgl-umons/RABBIT-ng/commits/)
 [![](https://img.shields.io/github/v/release/sgl-umons/RABBIT-ng?label=Latest%20Release)](https://github.com/sgl-umons/RABBIT-ng/releases/latest)
-[![SWH](https://archive.softwareheritage.org/badge/origin/https://github.com/natarajan-chidambaram/RABBIT/)](https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/natarajan-chidambaram/RABBIT)
+
 
 [![Python Version](https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13-blue)](https://pypi.org/project/rabbit/)
 # RABBIT - Activity-Based Bot Identification Tool
