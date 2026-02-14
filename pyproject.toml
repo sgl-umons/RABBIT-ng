@@ -1,11 +1,11 @@
 [project]
 name = "rabbit-ng"
-version = "3.0.0rc6"
+version = "3.0.0"
 license = {text = "Apache-2.0"}
 description = "GitHub bot identification tool based on activity sequences"
 readme = {file = "README.md", content-type = "text/markdown"}
 urls = {Homepage = "https://github.com/sgl-umons/RABBIT"}
-requires-python = ">=3.11, <3.14"
+requires-python = ">=3.11"
 dependencies = [
     "ghmap>=2.0.2",
     "numpy>=2.3.5, <3.0.0",
